@@ -124,8 +124,9 @@ Input: {user_input}
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[{"role": "system", "content": system_prompt}]
+            max_tokens=500
         )
         result = response.choices[0].message.content.strip()
     except Exception as e:
