@@ -2,50 +2,47 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, request, render_template, Response, session
-from openai import OpenAI
+import openai
 import os
 from functools import wraps
 import logging
 import datetime
 
+# 🔧 Initialize app + secret key first
+app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# ✅ Check env vars early
+USERNAME = os.getenv("APP_USERNAME")
+PASSWORD = os.getenv("APP_PASSWORD")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+print("USERNAME:", USERNAME)
+print("PASSWORD:", PASSWORD)
+print("OPENAI_API_KEY loaded:", bool(OPENAI_API_KEY))
+
+# ✅ Configure OpenAI (new style for v1+)
+openai.api_key = OPENAI_API_KEY
+
 IP_USAGE = {}
 
 def too_many_prompts(ip):
     IP_USAGE[ip] = IP_USAGE.get(ip, 0) + 1
-    return IP_USAGE[ip] > 5  # change 5 to whatever limit you want
-
-app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")  # no fallback for production
-
-# ✅ Create OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# 🔐 Add your login credentials here
-USERNAME = os.getenv("APP_USERNAME")
-PASSWORD = os.getenv("APP_PASSWORD")
-
-# Configure logging
-logging.basicConfig(
-    filename='logs/prompts.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s'
-)
+    return IP_USAGE[ip] > 5
 
 # 🔐 Basic auth helpers
 def check_auth(username, password):
     return username == USERNAME and password == PASSWORD
 
 def authenticate():
-    return Response(
-        'Unauthorized', 401,
-        {'WWW-Authenticate': 'Basic realm="Login Required"'}
-    )
+    return Response('Unauthorized', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
+            print("Auth failed:", auth)
             return authenticate()
         return f(*args, **kwargs)
     return decorated
@@ -63,7 +60,13 @@ VALID_CLASSES = {
     "Social Media Post": "post"
 }
 
-# 🔐 Protect your routes
+# 🪵 Logging setup
+logging.basicConfig(
+    filename='logs/prompts.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s'
+)
+
 @app.route("/", methods=["GET"])
 @requires_auth
 def index():
@@ -73,25 +76,21 @@ def index():
 @requires_auth
 def generate():
     user_input = request.form["user_input"]
-    
     user_ip = request.remote_addr
 
     if too_many_prompts(user_ip):
         return render_template("result.html", output="Limit reached. Please sign up to continue.")
-    
-    # 👇 Increment prompt count
+
     session["prompt_count"] = session.get("prompt_count", 0) + 1
     print(f"Prompt count this session: {session['prompt_count']}")
-    
-    timestamp = datetime.datetime.now().isoformat()
 
-    # Log it
+    timestamp = datetime.datetime.now().isoformat()
     with open("prompt_logs.txt", "a") as f:
         f.write(f"[{timestamp}] IP: {user_ip} | Prompt: {user_input}\n")
 
     logging.info(f"Raw input: {user_input}")
 
-    # Step 1: Classify the input
+    # 🔍 Step 1: Classification
     classification_prompt = f"""
 Classify the following input into one of the following categories:
 - Scope of Work
@@ -104,13 +103,16 @@ Input: {user_input}
 """
 
     try:
-        classification_response = client.chat.completions.create(
+        classification_response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": classification_prompt}]
+            messages=[{"role": "user", "content": classification_prompt}]
         )
         classification = classification_response.choices[0].message.content.strip()
+    except openai.APIError as e:
+        logging.error(f"OpenAI classification error: {e}")
+        return render_template("result.html", output="Error classifying your input.")
     except Exception as e:
-        return render_template("result.html", output=f"Classification error: {str(e)}")
+        return render_template("result.html", output=f"Error: {e}")
 
     prompt_key = VALID_CLASSES.get(classification)
     logging.info(f"Classified as: {classification} → Using prompt: {prompt_key}")
@@ -121,15 +123,17 @@ Input: {user_input}
     system_prompt = PROMPT_TEMPLATES[prompt_key].format(input=user_input)
 
     try:
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "system", "content": system_prompt}]
+            messages=[{"role": "user", "content": system_prompt}]
         )
         result = response.choices[0].message.content.strip()
+    except openai.RateLimitError:
+        result = "Quota exceeded. Check your OpenAI usage or billing settings."
     except Exception as e:
-        result = f"Error: {str(e)}"
+        result = f"Error generating output: {e}"
 
-    logging.info(f"Output generated: {result[:100]}...")  # Just log first 100 chars
+    logging.info(f"Output generated: {result[:100]}...")
     return render_template("result.html", output=result)
 
 
