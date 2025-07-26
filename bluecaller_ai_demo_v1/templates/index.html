@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+    <form action="/generate" method="post">
+        <label for="user_input">What do you need help with?</label>
+        <textarea name="user_input" id="user_input" required></textarea>
+        <button type="submit">Generate</button>
+    </form>
+{% endblock %}
+
+
