@@ -3,6 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <title>BlueCaller AI Demo</title>
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #10446C;
+            color: white;
+            padding: 1rem 2rem;
+        }
+        main {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            background-color: #337DB4;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .output-box {
+    background: #eef6fb;
+    border-left: 4px solid #6ADCE7;
+    padding: 1.5rem;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.95rem;
+    color: #222;
+    white-space: pre-wrap; /* Wrap long lines */
+    overflow-wrap: break-word; /* Break long words */
+    word-break: break-word;    /* For extra insurance */
+    max-width: 100%;
+    overflow-x: auto; /* Just in case of code formatting */
+}
+
+.output-box pre {
+    white-space: pre-wrap;     /* Let text wrap */
+    word-break: break-word;    /* Break long words if needed */
+    margin: 0;                 /* Remove default spacing */
+}
+        a {
+            display: inline-block;
+            margin-top: 1rem;
+            color: #10446C;
+            text-decoration: none;
+        }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">

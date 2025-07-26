@@ -68,11 +68,14 @@ VALID_CLASSES = {
 def index():
     return render_template("index.html")
 
+
 @app.route("/generate", methods=["POST"])
 @requires_auth
 def generate():
     user_input = request.form["user_input"]
     user_ip = request.remote_addr
+
+    print("User input:", user_input)
 
     if too_many_prompts(user_ip):
         return render_template("result.html", output="Limit reached. Please sign up to continue.")
@@ -113,12 +116,15 @@ Input: {user_input}
         return render_template("result.html", output="Sorry, I couldn't classify your input.")
 
     logging.info(f"Classified as: {classification} → Using prompt: {prompt_key}")
-
-    # Main generation
     system_prompt = PROMPT_TEMPLATES[prompt_key].format(input=user_input)
+
+    # DEBUGGING
+    print("Prompt key:", prompt_key)
+    print("System prompt:", system_prompt)
+
     try:
         response = client.chat.completions.create(
-            model="gpt-4",  # or gpt-4o if that’s what your org is allowed
+            model="gpt-4",
             messages=[{"role": "system", "content": system_prompt}]
         )
         result = response.choices[0].message.content.strip()
@@ -128,6 +134,9 @@ Input: {user_input}
     logging.info(f"Output generated: {result[:100]}...")
     return render_template("result.html", output=result)
 
+
+    
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    port = int(os.environ.get("PORT", 5000))  # 5000 for local fallback
+    app.run(host="0.0.0.0", port=port)
