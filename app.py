@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request, render_template, Response
-import openai
+from flask import Flask, request, render_template, Response, session
+from openai import OpenAI
 import os
 from functools import wraps
 import logging
+import datetime
 
 IP_USAGE = {}
 
@@ -14,14 +15,14 @@ def too_many_prompts(ip):
     return IP_USAGE[ip] > 5  # change 5 to whatever limit you want
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")  # Required for session use
+app.secret_key = os.getenv("FLASK_SECRET_KEY")  # no fallback for production
 
-app = Flask(__name__)
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# ✅ Create OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # 🔐 Add your login credentials here
-USERNAME = "demo"
-PASSWORD = "bluecaller2025"
+USERNAME = os.getenv("APP_USERNAME")
+PASSWORD = os.getenv("APP_PASSWORD")
 
 # Configure logging
 logging.basicConfig(
@@ -78,19 +79,16 @@ def generate():
     if too_many_prompts(user_ip):
         return render_template("result.html", output="Limit reached. Please sign up to continue.")
     
-     # 👇 Increment prompt count
+    # 👇 Increment prompt count
     session["prompt_count"] = session.get("prompt_count", 0) + 1
     print(f"Prompt count this session: {session['prompt_count']}")
     
-    # Get user IP address
-    user_ip = request.remote_addr
     timestamp = datetime.datetime.now().isoformat()
 
     # Log it
     with open("prompt_logs.txt", "a") as f:
         f.write(f"[{timestamp}] IP: {user_ip} | Prompt: {user_input}\n")
 
-        
     logging.info(f"Raw input: {user_input}")
 
     # Step 1: Classify the input
@@ -105,16 +103,17 @@ Only return the category name exactly.
 Input: {user_input}
 """
 
-    classification_response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": classification_prompt}]
-    )
+    try:
+        classification_response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": classification_prompt}]
+        )
+        classification = classification_response.choices[0].message.content.strip()
+    except Exception as e:
+        return render_template("result.html", output=f"Classification error: {str(e)}")
 
-    classification = classification_response["choices"][0]["message"]["content"].strip()
     prompt_key = VALID_CLASSES.get(classification)
-    
     logging.info(f"Classified as: {classification} → Using prompt: {prompt_key}")
-
 
     if not prompt_key:
         return render_template("result.html", output="Sorry, I couldn't classify your input.")
@@ -122,7 +121,7 @@ Input: {user_input}
     system_prompt = PROMPT_TEMPLATES[prompt_key].format(input=user_input)
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "system", "content": system_prompt}]
         )
@@ -130,12 +129,14 @@ Input: {user_input}
     except Exception as e:
         result = f"Error: {str(e)}"
 
-    return render_template("result.html", output=result)
     logging.info(f"Output generated: {result[:100]}...")  # Just log first 100 chars
+    return render_template("result.html", output=result)
 
+
+#if __name__ == "__main__":
+ #   import os
+#port = int(os.environ.get("PORT", 5000))
+#app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    import os
-port = int(os.environ.get("PORT", 5000))
-app.run(host="0.0.0.0", port=port)
-
+    app.run(debug=True)
