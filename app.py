@@ -19,7 +19,6 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 USERNAME = os.getenv("APP_USERNAME")
 PASSWORD = os.getenv("APP_PASSWORD")
 
-print("Loaded credentials:", USERNAME, PASSWORD)
 
 # IP usage limit
 IP_USAGE = {}
